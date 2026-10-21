@@ -1,10 +1,12 @@
 # Builds the installer from this repository, runs all tests, and keeps the unsigned installer as a build artifact.
+# A tag such as v0.1.0 also makes a GitHub release with that installer.
 # Nothing here signs the installer. See "Code signing policy" in the README.
 name: Build
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -19,12 +21,27 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      sha256: ${{ steps.info.outputs.sha256 }}
     steps:
       # Actions are pinned to a commit. The tag is in the comment.
       - name: Check out the source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # A release tag must be v<version>, with the version of src/installer.iss. This stops a release with the wrong version.
+      - name: Check the release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $line = Select-String -Path 'src/installer.iss' -Pattern '^#define InstallerVersion "(.+)"' | Select-Object -First 1
+          $version = $line.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "The tag is $($env:GITHUB_REF_NAME), but InstallerVersion in src/installer.iss is $version. Use the tag v$version, or change the version."
+          }
 
       # The installer file is pinned to the SHA-256 hash of Inno Setup 7.1.0, and must also have a valid signature of its publisher.
       - name: Install Inno Setup 7
@@ -69,11 +86,16 @@ jobs:
         run: python -I tools/build.py --unsigned
 
       - name: Show the hash of the installer
+        id: info
         shell: pwsh
         run: |
           $file = Get-Item -LiteralPath 'out/D2RLoader-Installer.exe'
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
-          $text = "D2RLoader-Installer.exe (not signed)`n`nSize: $($file.Length) bytes`n`nSHA-256: $hash`n`nCommit: $env:GITHUB_SHA"
+          $line = Select-String -Path 'src/installer.iss' -Pattern '^#define InstallerVersion "(.+)"' | Select-Object -First 1
+          $version = $line.Matches[0].Groups[1].Value
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $text = "D2RLoader-Installer.exe $version (not signed)`n`nSize: $($file.Length) bytes`n`nSHA-256: $hash`n`nCommit: $env:GITHUB_SHA"
           $text | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           $text
 
@@ -84,3 +106,50 @@ jobs:
           path: out/D2RLoader-Installer.exe
           if-no-files-found: error
           retention-days: 30
+
+  # Only for a release tag. This job may write releases. It does not check out the repository and runs none of its code.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Get the installer from the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: D2RLoader-Installer-unsigned
+          path: artifact
+
+      - name: Make the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $built = Join-Path 'artifact' 'D2RLoader-Installer.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $built).Hash.ToLowerInvariant()
+          if ($hash -ne $env:SHA256) {
+            throw "The installer from the build has the SHA-256 hash $hash. The build job reported $($env:SHA256)."
+          }
+
+          $asset = "D2RLoader-Installer-$($env:VERSION)-unsigned.exe"
+          Copy-Item -LiteralPath $built -Destination $asset
+          $notes = @(
+            "D2RLoader installer $($env:VERSION), built by GitHub Actions from commit $($env:GITHUB_SHA).",
+            "",
+            "**This file is not signed.** Windows can show an unknown publisher or SmartScreen warning.",
+            "",
+            "SHA-256 of ${asset}:",
+            "",
+            "``$hash``",
+            "",
+            "The installer that https://d2rloader.net/download.html offers is built on the maintainer's PC and signed with the project's own certificate. It is not the same file as this one."
+          ) -join "`n"
+          $notesFile = 'release-notes.md'
+          Set-Content -LiteralPath $notesFile -Value $notes -Encoding utf8
+
+          gh release create $env:GITHUB_REF_NAME $asset --repo $env:GITHUB_REPOSITORY --title "D2RLoader Installer $($env:VERSION)" --notes-file $notesFile --verify-tag

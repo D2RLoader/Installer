@@ -34,6 +34,22 @@ Choose the test folder in `publish-release.cmd`. The files go to the `test` fold
 
 This makes `out\D2RLoader-Installer-staging.exe`. It never replaces the real installer. Remove the files in the test folder afterwards.
 
+## Release the installer on GitHub
+
+The installer on the website and the installer on GitHub are two different files. The website offers the build from the maintainer's PC, signed with the project's own certificate. The GitHub release has the build from GitHub Actions, which is not signed.
+
+1. Set `InstallerVersion` in `src/installer.iss` and commit. Push `main` and wait for a green build.
+2. Make a signed tag with the same version, and push it. The tag must be `v` plus the version:
+
+   ```
+   git tag -s v0.1.0 -m "D2RLoader Installer 0.1.0"
+   git push github v0.1.0
+   ```
+
+3. The workflow builds again from the tagged commit and makes the release. Open the release page. Check the file name, the hash in the notes, and the text.
+
+If the job fails, remove the tag (`git push github :refs/tags/v0.1.0` and `git tag -d v0.1.0`), fix the problem, and tag again. A tag whose version does not match `InstallerVersion` stops the build before it starts.
+
 ## Signing
 
 `build-installer.cmd` signs Setup and its uninstaller when the certificate `CN=D2RLoader` is in the Windows certificate store. See [development.md](development.md#build) and the "Code signing policy" in the [README](../README.md#code-signing-policy).

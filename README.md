@@ -50,7 +50,7 @@ The installer connects only to d2rloader.net, over HTTPS, to get the manifest an
 
 The installer and its uninstaller are signed with the project's own certificate (`CN=D2RLoader`), the same certificate that signs `D2RLoader.exe`. It is not from a public certificate authority, so Windows can show an "unknown publisher" or SmartScreen warning. The download page shows the SHA-256 hash and the certificate thumbprint of the installer, so you can check your download.
 
-We plan to move to free code signing for open source projects from the [SignPath Foundation](https://signpath.org). With that, GitHub Actions would build the installer from this repository, and a signing request would need the maintainer's approval for each release. This section will then say so. Until then, the installer is built and signed on the maintainer's PC with `tools/build.py` (see [docs/releasing.md](docs/releasing.md)).
+We plan to move to free code signing for open source projects from the [SignPath Foundation](https://signpath.org). With that, the signing request would come from the GitHub Actions build of this repository, and each release would need the maintainer's approval. This section will then say so. Until then, the installer on the download page is built and signed on the maintainer's PC with `tools/build.py` (see [docs/releasing.md](docs/releasing.md)). GitHub Actions builds the same source without a signature, see below.
 
 Dimentio maintains the project and approves each release. The code was written with AI assistance, under the direction of the maintainer. Automated tests cover the installer (see [docs/development.md](docs/development.md#tests)), and anyone can review the source. The D2RLoader GitHub organization requires two-factor authentication for all members.
 
@@ -65,6 +65,8 @@ ISCC src\installer.iss
 The installer is `out\D2RLoader-Installer.exe`, and it is not signed. `build-installer.cmd` does the same and signs the installer when the certificate is in the Windows certificate store.
 
 The tests need Python 3 as well. Run `run-tests.cmd`, or `python -I tests/run-all.py`. They include end-to-end tests that run the real installer against a local web server and a fake game folder. See [docs/development.md](docs/development.md).
+
+GitHub Actions builds the installer and runs all the tests on every push ([workflow](.github/workflows/build.yml)). It installs Inno Setup 7.1.0 and checks the hash and the publisher signature of that installer first. Each run keeps the unsigned installer as the build artifact `D2RLoader-Installer-unsigned`, and prints its SHA-256 hash in the job summary. A tag such as `v0.1.0` also makes a [GitHub release](https://github.com/D2RLoader/Installer/releases) with that unsigned installer. Its notes name the commit and the hash.
 
 ## Documentation
 

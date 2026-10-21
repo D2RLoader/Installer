@@ -43,6 +43,20 @@ You need Inno Setup 7 and Python 3. Double-click `run-tests.cmd`, or run `python
 - `tests/check-publish.py` tests `tools/publish.py`. The "server" is a folder on your PC, `tests/fake_ssh.py` stands in for `ssh` and `scp`, and a small web server hands out that folder. Nothing leaves your PC.
 - `tests/check-languages.py` checks that every translation file has the same texts and `%` codes as `english.isl`, and that every text used in the code exists.
 
+### Continuous build
+
+`.github/workflows/build.yml` runs on every push to `main`, on pull requests, and on request. It runs on a GitHub-hosted Windows runner with read-only permissions. The two actions that it uses are pinned to commits. The steps are:
+
+1. Check out the source.
+2. Download Inno Setup 7.1.0 from its GitHub release. The step stops if the SHA-256 hash is not the pinned one, or if the file does not have a valid signature of Pyrsys B.V.
+3. Run `tests/run-all.py`. This is the same suite as `run-tests.cmd`.
+4. Build the installer with `tools/build.py --unsigned`.
+5. Write the size and the SHA-256 hash to the job summary, and keep the installer as the artifact `D2RLoader-Installer-unsigned`.
+
+To use a newer Inno Setup, change the version in the URL and the hash in the workflow together.
+
+A tag that starts with `v` (for example `v0.1.0`) also starts a second job, `release`. The build job first checks that the tag is `v` plus the `InstallerVersion` in `src/installer.iss`, so a wrong tag stops the build. The `release` job gets the installer from the build and checks its hash against the one that the build reported. Then it makes a GitHub release with the file `D2RLoader-Installer-<version>-unsigned.exe`. This job has write access to releases. It does not check out the repository and runs none of its code. The release notes have the commit, the hash, and a note that the file is not signed.
+
 ### The test build
 
 The test build (`/DTEST_LOOPBACK`) exists only for the tests. It allows `http://127.0.0.1` and reads the manifest address from `/Manifest=`. It never reads the real registry, so a test cannot change a real game folder. It takes its "found" game folders from `/FakeBattleNet=` and `/FakeSteam=`, and keeps its uninstaller in the folder from `/UninstDir=`. It does not change the list of installed apps. The test script stops at once if the installer uses another folder than the one it was given. The production build has none of these options.
