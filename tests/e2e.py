@@ -180,6 +180,20 @@ def logged_game_folder(log_text):
 	return None
 
 
+def long_path(path):
+	"""The long spelling of an existing path (C:\\Users\\RUNNER~1 becomes C:\\Users\\runneradmin). Other paths stay as they are."""
+	kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+	kernel32.GetLongPathNameW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+	kernel32.GetLongPathNameW.restype = ctypes.c_uint32
+	buffer = ctypes.create_unicode_buffer(32768)
+	length = kernel32.GetLongPathNameW(str(path), buffer, len(buffer))
+	return buffer.value if 0 < length < len(buffer) else str(path)
+
+
+def same_path(first, second):
+	return os.path.normcase(long_path(first)) == os.path.normcase(long_path(second))
+
+
 def abort_unsafe(message):
 	print("ABORT: " + message, flush=True)
 	os._exit(3)
@@ -635,7 +649,10 @@ def test_shortcuts(work):
 	done = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True, timeout=60)
 	lines = [line.strip() for line in done.stdout.splitlines() if line.strip()]
 	want = [str(game).replace("/", "\\") + "\\D2RLoader.exe", str(game).replace("/", "\\")]
-	check(lines[:2] == want, f"shortcuts: the shortcut starts D2RLoader.exe in the game folder (got {lines} {done.stderr.strip()[:200]})")
+	# Windows returns the target in the long spelling of the path, and the working folder as it was stored.
+	# Compare the folders, not the spelling: a GitHub runner gives TEMP as C:\Users\RUNNER~1\...
+	same = [same_path(line, wanted) for line, wanted in zip(lines[:2], want)]
+	check(len(lines) >= 2 and all(same), f"shortcuts: the shortcut starts D2RLoader.exe in the game folder (got {lines} {done.stderr.strip()[:200]})")
 
 
 def test_settings_and_installs(work):
