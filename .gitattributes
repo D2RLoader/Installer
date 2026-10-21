@@ -1,0 +1,2 @@
+# Batch files need Windows line endings. A label with only LF can make cmd.exe jump to the wrong line.
+*.cmd text eol=crlf

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "version": 1,
+  "files": [
+    {
+      "path": "D2RLoader.exe",
+      "url": "https://d2rloader.net/download/D2RLoader.exe",
+      "size": 1234,
+      "sha256": "93021dad48533bcfca8a95c69a0cc00cdb9008a3ce6ceba1d04c7aca71985a10"
+    }
+  ],
+  "folders": [
+    "mods"
+  ]
+}

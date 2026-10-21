@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "version": "1.3.1-beta",
+  "files": [
+    {
+      "path": "D2RLoader.exe",
+      "url": "https://d2rloader.net/download/D2RLoader.exe",
+      "size": 23331160,
+      "sha256": "93021dad48533bcfca8a95c69a0cc00cdb9008a3ce6ceba1d04c7aca71985a10"
+    },
+    {
+      "path": "D2RCore.dll",
+      "url": "https://d2rloader.net/download/D2RCore.dll",
+      "size": 18938712,
+      "sha256": "2a868d013d2e0830bd2d9e04b918b19e46a73cf726c833e70d089b948fdeb5a2"
+    },
+    {
+      "path": "d2rloader.mpq",
+      "url": "https://d2rloader.net/download/d2rloader.mpq",
+      "size": 11398483,
+      "sha256": "1f02aa4e3179cb8a8417125160aa3ef18003ea81ee1a4f54e0a76fd3f22d933b"
+    },
+    {
+      "path": "d2rloader/config/d2rloader.toml",
+      "url": "https://d2rloader.net/download/d2rloader.toml",
+      "size": 9235,
+      "sha256": "86be762edb678386ef109589df85cb234cf13d992c548607a44f072d77655e42",
+      "onlyIfMissing": true
+    }
+  ],
+  "folders": ["mods", "d2rloader/plugins", "d2rloader/data", "d2rloader/logs", "d2rloader/crashes"]
+}

@@ -1,0 +1,9 @@
+# Build output and test reports
+out/
+
+# Temporary files
+.tmp/
+__pycache__/
+
+# Your own settings for publishing (the target server). publish.env.example is the template.
+publish.env
