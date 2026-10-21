@@ -1,0 +1,86 @@
+# Builds the installer from this repository, runs all tests, and keeps the unsigned installer as a build artifact.
+# Nothing here signs the installer. See "Code signing policy" in the README.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # Actions are pinned to a commit. The tag is in the comment.
+      - name: Check out the source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The installer file is pinned to the SHA-256 hash of Inno Setup 7.1.0, and must also have a valid signature of its publisher.
+      - name: Install Inno Setup 7
+        shell: pwsh
+        env:
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
+          INNO_SHA256: 0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $setup
+
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+          if ($hash -ne $env:INNO_SHA256) {
+            throw "The Inno Setup installer has the SHA-256 hash $hash. Expected $($env:INNO_SHA256)."
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $setup
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike 'CN=Pyrsys B.V.,*') {
+            throw "The Inno Setup installer does not have a valid signature of Pyrsys B.V. ($($signature.Status))."
+          }
+
+          $dir = Join-Path $env:RUNNER_TEMP 'InnoSetup7'
+          $install = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$dir" -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "The Inno Setup installer stopped with the exit code $($install.ExitCode)."
+          }
+          $iscc = Join-Path $dir 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC.exe was not found in $dir."
+          }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & $iscc '--version'
+
+      # Unit tests, end-to-end tests, translation checks, and tool tests. The script stops with an error if one fails.
+      - name: Run the tests
+        shell: pwsh
+        run: python -I tests/run-all.py
+
+      - name: Build the installer (not signed)
+        shell: pwsh
+        run: python -I tools/build.py --unsigned
+
+      - name: Show the hash of the installer
+        shell: pwsh
+        run: |
+          $file = Get-Item -LiteralPath 'out/D2RLoader-Installer.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+          $text = "D2RLoader-Installer.exe (not signed)`n`nSize: $($file.Length) bytes`n`nSHA-256: $hash`n`nCommit: $env:GITHUB_SHA"
+          $text | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          $text
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: D2RLoader-Installer-unsigned
+          path: out/D2RLoader-Installer.exe
+          if-no-files-found: error
+          retention-days: 30
