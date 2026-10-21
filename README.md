@@ -52,7 +52,7 @@ The installer and its uninstaller are signed with the project's own certificate 
 
 We plan to move to free code signing for open source projects from the [SignPath Foundation](https://signpath.org). With that, GitHub Actions would build the installer from this repository, and a signing request would need the maintainer's approval for each release. This section will then say so. Until then, the installer is built and signed on the maintainer's PC with `tools/build.py` (see [docs/releasing.md](docs/releasing.md)).
 
-Dimentio maintains the project and approves each release. The code was written with AI assistance, under the direction of the maintainer. Automated tests cover the installer (see [docs/development.md](docs/development.md#tests)), and anyone can review the source.
+Dimentio maintains the project and approves each release. The code was written with AI assistance, under the direction of the maintainer. Automated tests cover the installer (see [docs/development.md](docs/development.md#tests)), and anyone can review the source. The D2RLoader GitHub organization requires two-factor authentication for all members.
 
 ## Build from source
 
